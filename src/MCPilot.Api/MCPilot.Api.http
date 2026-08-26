@@ -1,0 +1,35 @@
+@host = http://localhost:5080
+
+### Saglik / MCP durumu
+GET {{host}}/api/health
+
+### Kesfedilen MCP araclari
+GET {{host}}/api/tools
+
+### Bir MCP aracini dogrudan calistir (LLM devrede degil)
+POST {{host}}/api/tools/db__list_tables/invoke
+Content-Type: application/json
+
+{}
+
+### Soru sor (tam yanit)
+POST {{host}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "Gecen ay en cok satan 5 urunu listele",
+  "userId": "demo-user"
+}
+
+### Soru sor (SSE akisi)
+POST {{host}}/api/chat/stream
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "message": "Musteri sayisi kac?",
+  "conversationId": ""
+}
+
+### Konusmalar
+GET {{host}}/api/conversations
