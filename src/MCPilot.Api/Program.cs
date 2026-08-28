@@ -20,6 +20,26 @@ builder.Services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.AddSecurityDefinition("ApiKey", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "X-Api-Key",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Servis API anahtari.",
+    });
+
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        [new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+        {
+            Reference = new Microsoft.OpenApi.Models.OpenApiReference
+            {
+                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                Id = "ApiKey",
+            },
+        }] = Array.Empty<string>(),
+    });
+
     options.SwaggerDoc("v1", new()
     {
         Title = "MCPilot API",
@@ -47,6 +67,9 @@ builder.Services.AddCors(options => options.AddPolicy(AngularCorsPolicy, policy 
         .AllowCredentials();
 }));
 
+var apiKeyOptions = builder.Configuration.GetSection(ApiKeyOptions.SectionName).Get<ApiKeyOptions>() ?? new ApiKeyOptions();
+builder.Services.AddSingleton(apiKeyOptions);
+
 builder.Services.AddMCPilot(builder.Configuration);
 
 var app = builder.Build();
@@ -69,13 +92,14 @@ app.UseExceptionHandler(handler => handler.Run(async context =>
     await context.Response.WriteAsJsonAsync(problem);
 }));
 
-if (app.Environment.IsDevelopment())
+if (app.Configuration.GetValue("Swagger:Enabled", app.Environment.IsDevelopment()))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
 app.UseCors(AngularCorsPolicy);
+app.UseMiddleware<ApiKeyMiddleware>();
 app.UseMiddleware<SessionCookieMiddleware>();
 app.MapControllers();
 
