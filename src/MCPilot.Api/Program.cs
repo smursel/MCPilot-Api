@@ -1,6 +1,7 @@
 using MCPilot.Api.Infrastructure;
 using MCPilot.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -70,9 +71,23 @@ builder.Services.AddCors(options => options.AddPolicy(AngularCorsPolicy, policy 
 var apiKeyOptions = builder.Configuration.GetSection(ApiKeyOptions.SectionName).Get<ApiKeyOptions>() ?? new ApiKeyOptions();
 builder.Services.AddSingleton(apiKeyOptions);
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
 builder.Services.AddMCPilot(builder.Configuration);
 
 var app = builder.Build();
+
+// nginx arkasinda calisirken sema (https) ve istemci IP'si bu basliklardan okunur.
+app.UseForwardedHeaders();
+
+var pathBase = app.Configuration["PathBase"];
+if (!string.IsNullOrWhiteSpace(pathBase))
+{
+    app.UsePathBase(pathBase);
+}
 
 app.UseExceptionHandler(handler => handler.Run(async context =>
 {
