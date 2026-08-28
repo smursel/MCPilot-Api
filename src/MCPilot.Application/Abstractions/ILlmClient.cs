@@ -1,10 +1,8 @@
-namespace MCPilot.Application.Abstractions;
-
 using MCPilot.Application.Models;
+
+namespace MCPilot.Application.Abstractions;
 
 public interface ILlmClient
 {
-    Task<ChatResponse> AskAsync(ChatRequest request, CancellationToken cancellationToken);
-    IAsyncEnumerable<ChatEvent> StreamAsync(ChatRequest request, CancellationToken ct = default);
-
+    Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct = default);
 }

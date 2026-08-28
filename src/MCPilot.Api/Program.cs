@@ -1,0 +1,82 @@
+using MCPilot.Api.Infrastructure;
+using MCPilot.Infrastructure;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+
+var builder = WebApplication.CreateBuilder(args);
+
+const string AngularCorsPolicy = "angular";
+
+builder.Services
+    .AddControllers()
+    .AddNewtonsoftJson(options =>
+    {
+        options.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+        options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
+    });
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new()
+    {
+        Title = "MCPilot API",
+        Version = "v1",
+        Description = "Dogal dil sorularini MCP araclari uzerinden veritabanina baglayan sohbet API'si.",
+    });
+
+    var xmlFile = Path.Combine(AppContext.BaseDirectory, $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml");
+    if (File.Exists(xmlFile))
+    {
+        options.IncludeXmlComments(xmlFile);
+    }
+});
+
+builder.Services.AddProblemDetails();
+
+builder.Services.AddCors(options => options.AddPolicy(AngularCorsPolicy, policy =>
+{
+    var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                  ?? ["http://localhost:4200"];
+
+    policy.WithOrigins(origins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials();
+}));
+
+builder.Services.AddMCPilot(builder.Configuration);
+
+var app = builder.Build();
+
+app.UseExceptionHandler(handler => handler.Run(async context =>
+{
+    var feature = context.Features.Get<IExceptionHandlerFeature>();
+    var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("MCPilot.Api");
+    logger.LogError(feature?.Error, "Istek islenirken hata olustu: {Path}", context.Request.Path);
+
+    var problem = new ProblemDetails
+    {
+        Title = "Istek islenemedi",
+        Status = StatusCodes.Status500InternalServerError,
+        Detail = app.Environment.IsDevelopment() ? feature?.Error.Message : "Beklenmeyen bir hata olustu.",
+    };
+
+    context.Response.StatusCode = problem.Status.Value;
+    context.Response.ContentType = "application/problem+json";
+    await context.Response.WriteAsJsonAsync(problem);
+}));
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseCors(AngularCorsPolicy);
+app.UseMiddleware<SessionCookieMiddleware>();
+app.MapControllers();
+
+app.Run();
