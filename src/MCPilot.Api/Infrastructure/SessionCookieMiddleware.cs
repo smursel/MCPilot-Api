@@ -15,7 +15,7 @@ public sealed class SessionCookieMiddleware(RequestDelegate next)
             context.Response.Cookies.Append(CookieName, sessionId, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
+                Secure = context.Request.IsHttps,
                 SameSite = SameSiteMode.Lax,
                 IsEssential = true,
                 Expires = DateTimeOffset.UtcNow.AddDays(30),
