@@ -17,6 +17,8 @@ public sealed class AnthropicLlmClient(
 {
     private readonly AnthropicOptions _options = options.Value;
 
+    public LlmModelInfo ModelInfo => new("anthropic", _options.Model, SupportsTools: true, SupportsThinking: _options.EnableThinking);
+
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct = default)
     {
         MessageCreateParamsSystem? system = null;
