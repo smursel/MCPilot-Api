@@ -2,6 +2,7 @@ using System.Text.Json;
 using Anthropic;
 using Anthropic.Models.Messages;
 using MCPilot.Application.Abstractions;
+using MCPilot.Application.Llm;
 using MCPilot.Application.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,11 +14,17 @@ namespace MCPilot.Infrastructure.Llm;
 public sealed class AnthropicLlmClient(
     AnthropicClient client,
     IOptions<AnthropicOptions> options,
+    LlmRuntimeState state,
     ILogger<AnthropicLlmClient> logger) : ILlmClient
 {
     private readonly AnthropicOptions _options = options.Value;
 
-    public LlmModelInfo ModelInfo => new("anthropic", _options.Model, SupportsTools: true, SupportsThinking: _options.EnableThinking);
+    private string ActiveModel =>
+        string.Equals(state.Current.Provider, LlmCatalog.Anthropic, StringComparison.OrdinalIgnoreCase)
+            ? state.Current.Model
+            : _options.Model;
+
+    public LlmModelInfo ModelInfo => new(LlmCatalog.Anthropic, ActiveModel, SupportsTools: true, SupportsThinking: _options.EnableThinking);
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct = default)
     {
@@ -38,7 +45,7 @@ public sealed class AnthropicLlmClient(
 
         var parameters = new MessageCreateParams
         {
-            Model = _options.Model,
+            Model = ActiveModel,
             MaxTokens = _options.MaxTokens,
             Messages = [.. request.Messages.Select(ToMessageParam)],
             OutputConfig = new OutputConfig { Effort = ParseEffort(_options.Effort) },
@@ -58,7 +65,7 @@ public sealed class AnthropicLlmClient(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Claude cagrisi basarisiz oldu (model={Model}).", _options.Model);
+            logger.LogError(ex, "Claude cagrisi basarisiz oldu (model={Model}).", ActiveModel);
             throw new LlmProviderException($"Claude API cagrisi basarisiz: {ex.Message}", ex);
         }
 
@@ -84,7 +91,7 @@ public sealed class AnthropicLlmClient(
         }
 
         var usage = new UsageInfo(
-            _options.Model,
+            ActiveModel,
             (int)message.Usage.InputTokens,
             (int)message.Usage.OutputTokens);
 
