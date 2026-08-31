@@ -1,6 +1,7 @@
 using Anthropic;
 using MCPilot.Application.Abstractions;
 using MCPilot.Application.Chat;
+using MCPilot.Application.Llm;
 using MCPilot.Application.Options;
 using MCPilot.Infrastructure.Conversations;
 using MCPilot.Infrastructure.Llm;
@@ -29,22 +30,24 @@ public static class DependencyInjection
                 : new AnthropicClient { ApiKey = options.ApiKey };
         });
 
-        // Llm:Provider = anthropic | deepseek
-        var provider = configuration["Llm:Provider"] ?? "anthropic";
+        // Baslangic secimi yapilandirmadan gelir; POST /api/model ile calisma aninda degistirilebilir.
+        var provider = configuration["Llm:Provider"] ?? LlmCatalog.Anthropic;
+        var startupModel = string.Equals(provider, LlmCatalog.DeepSeek, StringComparison.OrdinalIgnoreCase)
+            ? configuration["DeepSeek:Model"] ?? "deepseek-chat"
+            : configuration["Anthropic:Model"] ?? "claude-opus-5";
 
-        if (string.Equals(provider, "deepseek", StringComparison.OrdinalIgnoreCase))
+        services.AddSingleton(new LlmRuntimeState(provider, startupModel));
+
+        services.AddScoped<AnthropicLlmClient>();
+        services.AddHttpClient<DeepSeekLlmClient>((sp, client) =>
         {
-            services.AddHttpClient<ILlmClient, DeepSeekLlmClient>((sp, client) =>
-            {
-                var deepSeek = sp.GetRequiredService<IOptions<DeepSeekOptions>>().Value;
-                client.BaseAddress = new Uri(deepSeek.BaseUrl);
-                client.Timeout = TimeSpan.FromSeconds(deepSeek.TimeoutSeconds);
-            });
-        }
-        else
-        {
-            services.AddSingleton<ILlmClient, AnthropicLlmClient>();
-        }
+            var deepSeek = sp.GetRequiredService<IOptions<DeepSeekOptions>>().Value;
+            client.BaseAddress = new Uri(deepSeek.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(deepSeek.TimeoutSeconds);
+        });
+
+        services.AddScoped<ILlmClient, RoutingLlmClient>();
+
         services.AddSingleton<McpToolCatalog>();
         services.AddSingleton<IToolCatalog>(sp => sp.GetRequiredService<McpToolCatalog>());
         services.AddSingleton<IConversationStore, InMemoryConversationStore>();

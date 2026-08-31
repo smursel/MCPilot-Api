@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using MCPilot.Application.Abstractions;
+using MCPilot.Application.Llm;
 using MCPilot.Application.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,21 +16,27 @@ namespace MCPilot.Infrastructure.Llm;
 public sealed class DeepSeekLlmClient(
     HttpClient httpClient,
     IOptions<DeepSeekOptions> options,
+    LlmRuntimeState state,
     ILogger<DeepSeekLlmClient> logger) : ILlmClient
 {
     private readonly DeepSeekOptions _options = options.Value;
 
+    private string ActiveModel =>
+        string.Equals(state.Current.Provider, LlmCatalog.DeepSeek, StringComparison.OrdinalIgnoreCase)
+            ? state.Current.Model
+            : _options.Model;
+
     public LlmModelInfo ModelInfo => new(
-        "deepseek",
-        _options.Model,
-        SupportsTools: !_options.Model.Contains("reasoner", StringComparison.OrdinalIgnoreCase),
-        SupportsThinking: _options.Model.Contains("reasoner", StringComparison.OrdinalIgnoreCase));
+        LlmCatalog.DeepSeek,
+        ActiveModel,
+        SupportsTools: !ActiveModel.Contains("reasoner", StringComparison.OrdinalIgnoreCase),
+        SupportsThinking: ActiveModel.Contains("reasoner", StringComparison.OrdinalIgnoreCase));
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct = default)
     {
         var payload = new JObject
         {
-            ["model"] = _options.Model,
+            ["model"] = ActiveModel,
             ["max_tokens"] = _options.MaxTokens,
             ["temperature"] = _options.Temperature,
             ["stream"] = false,
@@ -58,7 +65,7 @@ public sealed class DeepSeekLlmClient(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "DeepSeek cagrisi basarisiz oldu (model={Model}).", _options.Model);
+            logger.LogError(ex, "DeepSeek cagrisi basarisiz oldu (model={Model}).", ActiveModel);
             throw new LlmProviderException($"DeepSeek API cagrisi basarisiz: {ex.Message}", ex);
         }
 
@@ -102,7 +109,7 @@ public sealed class DeepSeekLlmClient(
         }
 
         var usage = new UsageInfo(
-            _options.Model,
+            ActiveModel,
             json["usage"]?["prompt_tokens"]?.Value<int>() ?? 0,
             json["usage"]?["completion_tokens"]?.Value<int>() ?? 0);
 
