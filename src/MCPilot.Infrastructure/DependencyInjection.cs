@@ -17,6 +17,7 @@ public static class DependencyInjection
     {
         services.Configure<ChatOptions>(configuration.GetSection(ChatOptions.SectionName));
         services.Configure<AnthropicOptions>(configuration.GetSection(AnthropicOptions.SectionName));
+        services.Configure<DeepSeekOptions>(configuration.GetSection(DeepSeekOptions.SectionName));
         services.Configure<McpOptions>(configuration.GetSection(McpOptions.SectionName));
 
         services.AddSingleton(provider =>
@@ -28,7 +29,22 @@ public static class DependencyInjection
                 : new AnthropicClient { ApiKey = options.ApiKey };
         });
 
-        services.AddSingleton<ILlmClient, AnthropicLlmClient>();
+        // Llm:Provider = anthropic | deepseek
+        var provider = configuration["Llm:Provider"] ?? "anthropic";
+
+        if (string.Equals(provider, "deepseek", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddHttpClient<ILlmClient, DeepSeekLlmClient>((sp, client) =>
+            {
+                var deepSeek = sp.GetRequiredService<IOptions<DeepSeekOptions>>().Value;
+                client.BaseAddress = new Uri(deepSeek.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(deepSeek.TimeoutSeconds);
+            });
+        }
+        else
+        {
+            services.AddSingleton<ILlmClient, AnthropicLlmClient>();
+        }
         services.AddSingleton<McpToolCatalog>();
         services.AddSingleton<IToolCatalog>(sp => sp.GetRequiredService<McpToolCatalog>());
         services.AddSingleton<IConversationStore, InMemoryConversationStore>();
