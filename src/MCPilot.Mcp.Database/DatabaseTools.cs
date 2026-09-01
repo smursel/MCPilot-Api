@@ -14,12 +14,13 @@ public static class DatabaseTools
     private static string GetConnectionString()
     {
         var connStr = Environment.GetEnvironmentVariable("MCPILOT_DB_CONNECTION");
-        return connStr ?? throw new Exception("Database connection string is missing, babeee! Check appsettings.");
+        return connStr ?? throw new Exception("Database connection string is missing, please Check appsettings.");
     }
 
+   //GetSalesSummary
    [McpServerTool(Name = "get_sales_summary", ReadOnly = true)]
-    [Description("Belirli bir dönemdeki Toplam Ciro, Toplam Kar, Toplam Sipariş Sayısı ve Ortalama Sipariş Tutarını döndürür.")]
-    public static object GetSalesSummary(
+   [Description("Belirli bir dönemdeki Toplam Ciro, Toplam Kar, Toplam Sipariş Sayısı ve Ortalama Sipariş Tutarını döndürür.")]
+   public static object GetSalesSummary(
         [Description("Başlangıç tarihi (yyyy-MM-dd)")] string from,
         [Description("Bitiş tarihi (yyyy-MM-dd)")] string to)
     {
@@ -33,37 +34,44 @@ public static class DatabaseTools
             FROM vw_SalesAnalytics
             WHERE OrderDate >= @StartDate::timestamp AND OrderDate <= @EndDate::timestamp;";
             
-        return connection.QueryFirstOrDefault(sqlQuery, new { StartDate = from, EndDate = to });
+        return connection.QueryFirstOrDefault(sqlQuery, new { StartDate = from, EndDate = to })!;
     }
 
-    [McpServerTool(Name = "get_top_products", ReadOnly = true)] //[cite: 18]
-    [Description("Belirli bir tarih aralığındaki en çok satan ürünleri (adet ve ciro bazında) döndürür.")] //[cite: 18]
+    //GetTopProducts
+    [McpServerTool(Name = "get_top_products", ReadOnly = true)] 
+    [Description("Belirli bir tarih aralığındaki en çok satan ürünleri (adet ve ciro bazında) döndürür.")]  
     public static object GetTopProducts(
-        [Description("Başlangıç tarihi (yyyy-MM-dd)")] string from, //[cite: 18]
-        [Description("Bitiş tarihi (yyyy-MM-dd)")] string to, //[cite: 18]
-        [Description("Kaç ürün döndürülecek (varsayılan 5)")] int limit = 5) //[cite: 18]
+        [Description("Başlangıç tarihi (yyyy-MM-dd)")] string from, 
+        [Description("Bitiş tarihi (yyyy-MM-dd)")] string to, 
+        [Description("Opsiyonel kategori adı filtresi (örn. Electronics)")] string? category = null,
+        [Description("Kaç ürün döndürülecek (varsayılan 5)")] int limit = 5) 
     {
-        using var connection = new NpgsqlConnection(GetConnectionString()); //[cite: 18]
+        using var connection = new NpgsqlConnection(GetConnectionString()); 
         var sqlQuery = @"
-            SELECT ProductName, CategoryName, SUM(Quantity) AS TotalUnits, SUM(LineRevenue) AS TotalRevenue
+            SELECT ProductName, CategoryName, SUM(Quantity) AS TotalUnits, SUM(LineRevenue) AS TotalRevenue, SUM(LineProfit) AS TotalProfit
             FROM vw_SalesAnalytics
             WHERE OrderDate >= @StartDate::timestamp AND OrderDate <= @EndDate::timestamp
             GROUP BY ProductName, CategoryName
             ORDER BY TotalUnits DESC
             LIMIT @Limit;";
             
-        return connection.Query(sqlQuery, new { StartDate = from, EndDate = to, Limit = limit }); //[cite: 18]
-    }
+        return connection.Query(sqlQuery, new { 
+            StartDate = from,
+            EndDate = to,
+            CategoryName = string.IsNullOrWhiteSpace(category) ? null : category,
+            Limit = limit });
+        }
 
+    //GetCategorySales
     [McpServerTool(Name = "get_category_sales", ReadOnly = true)]
-    [Description("Hangi ürün kategorisinin (örn. Elektronik, Kozmetik) ne kadar gelir getirdiğini ve adet sattığını döndürür.")]
-    public static object GetCategorySales(
+   [Description("Ürün kategorilerinin ciro, kâr ve adet performansını döndürür.")]    
+   public static object GetCategorySales(
         [Description("Başlangıç tarihi (yyyy-MM-dd)")] string from,
         [Description("Bitiş tarihi (yyyy-MM-dd)")] string to)
     {
         using var connection = new NpgsqlConnection(GetConnectionString());
         var sqlQuery = @"
-            SELECT CategoryName, SUM(LineRevenue) AS TotalRevenue, SUM(Quantity) AS TotalQuantity
+            SELECT CategoryName, SUM(LineRevenue) AS TotalRevenue, SUM(LineProfit) AS TotalProfit, SUM(Quantity) AS TotalQuantity
             FROM vw_SalesAnalytics
             WHERE OrderDate >= @StartDate::timestamp AND OrderDate <= @EndDate::timestamp
             GROUP BY CategoryName
@@ -71,14 +79,15 @@ public static class DatabaseTools
             
         return connection.Query(sqlQuery, new { StartDate = from, EndDate = to });
     }
-
-    [McpServerTool(Name = "get_city_sales", ReadOnly = true)] //[cite: 18]
-    [Description("Belirli bir tarih aralığında şehirlere göre satış (ciro) ve kar dağılımını döndürür. Bölgesel analizler için kullanılır.")] //[cite: 18]
+    
+    //GetCitySales
+    [McpServerTool(Name = "get_city_sales", ReadOnly = true)] 
+    [Description("Belirli bir tarih aralığında şehirlere göre satış (ciro) ve kar dağılımını döndürür. Bölgesel analizler için kullanılır.")] 
     public static object GetCitySales(
-        [Description("Başlangıç tarihi (yyyy-MM-dd)")] string from, //[cite: 18]
-        [Description("Bitiş tarihi (yyyy-MM-dd)")] string to) //[cite: 18]
+        [Description("Başlangıç tarihi (yyyy-MM-dd)")] string from, 
+        [Description("Bitiş tarihi (yyyy-MM-dd)")] string to)
     {
-        using var connection = new NpgsqlConnection(GetConnectionString()); //[cite: 18]
+        using var connection = new NpgsqlConnection(GetConnectionString());
         var sqlQuery = @"
             SELECT City, SUM(LineRevenue) AS TotalRevenue, SUM(LineProfit) AS TotalProfit
             FROM vw_SalesAnalytics
@@ -86,9 +95,10 @@ public static class DatabaseTools
             GROUP BY City
             ORDER BY TotalRevenue DESC;";
             
-        return connection.Query(sqlQuery, new { StartDate = from, EndDate = to }); //[cite: 18]
+        return connection.Query(sqlQuery, new { StartDate = from, EndDate = to });
     }
 
+    //GetCountrySales
     [McpServerTool(Name = "get_country_sales", ReadOnly = true)]
     [Description("Şirketin uluslararası pazardaki performansını ve ülkelere göre gelir dağılımını gösterir.")]
     public static object GetCountrySales(
@@ -106,21 +116,39 @@ public static class DatabaseTools
         return connection.Query(sqlQuery, new { StartDate = from, EndDate = to });
     }
 
-    [McpServerTool(Name = "get_top_customers", ReadOnly = true)] //[cite: 18]
-    [Description("Şirkete en çok gelir sağlayan, sadakat puanı ve toplam değeri (LTV) en yüksek olan VIP müşterileri listeler.")] //[cite: 18]
-    public static object GetTopCustomers(
-        [Description("Döndürülecek müşteri sayısı (varsayılan 5)")] int limit = 5) //[cite: 18]
+    //GetProductProfitMargins
+    [McpServerTool(Name = "get_product_profit_margins", ReadOnly = true)]
+    [Description("Ürünlerin güncel satış fiyatı, maliyeti ve hesaplanan kar marjı yüzdelerini listeler.")]
+    public static object GetProductProfitMargins(
+        [Description("Döndürülecek ürün sayısı (varsayılan 10)")] int limit = 10)
     {
-        using var connection = new NpgsqlConnection(GetConnectionString()); //[cite: 18]
+        using var connection = new NpgsqlConnection(GetConnectionString());
+        var sqlQuery = @"
+            SELECT name AS ProductName, ProfitMargin
+            FROM vw_CurrentProductProfitMargin
+            ORDER BY ProfitMargin DESC
+            LIMIT @Limit;";
+            
+        return connection.Query(sqlQuery, new { Limit = limit });
+    }
+
+    //GetTopCustomers
+    [McpServerTool(Name = "get_top_customers", ReadOnly = true)] 
+    [Description("Şirkete en çok gelir sağlayan, sadakat puanı ve toplam değeri (LTV) en yüksek olan VIP müşterileri listeler.")] 
+    public static object GetTopCustomers(
+        [Description("Döndürülecek müşteri sayısı (varsayılan 5)")] int limit = 5)
+    {
+        using var connection = new NpgsqlConnection(GetConnectionString());
         var sqlQuery = @"
             SELECT CustomerFullName, CurrentSegment, LoyaltyScore, LifeTimeValue, TotalOrders
             FROM vw_CustomerInsights
             ORDER BY LoyaltyScore DESC
             LIMIT @Limit;";
             
-        return connection.Query(sqlQuery, new { Limit = limit }); //[cite: 18]
+        return connection.Query(sqlQuery, new { Limit = limit });
     }
 
+    //GetCustomerSegments
     [McpServerTool(Name = "get_customer_segments", ReadOnly = true)]
     [Description("Müşterilerin harcama alışkanlıklarına göre ayrıldığı grupların (VIP, Loyal vb.) toplam ciro içindeki payını gösterir.")]
     public static object GetCustomerSegments()
@@ -135,18 +163,19 @@ public static class DatabaseTools
         return connection.Query(sqlQuery);
     }
 
-    [McpServerTool(Name = "get_monthly_trend", ReadOnly = true)] //[cite: 18]
-    [Description("Belirli bir yılın aylık bazda toplam ciro ve kar trendini döndürür. Mevsimsel yükseliş ve düşüşleri görmek için kullanılır.")] //[cite: 18]
+    //GetMonthlyTrend
+    [McpServerTool(Name = "get_monthly_trend", ReadOnly = true)]
+    [Description("Belirli bir yılın aylık bazda toplam ciro ve kar trendini döndürür. Mevsimsel yükseliş ve düşüşleri görmek için kullanılır.")] 
     public static object GetMonthlyTrend(
-        [Description("Analiz edilecek yıl (örneğin: 2026)")] int year) //[cite: 18]
+        [Description("Analiz edilecek yıl (örneğin: 2026)")] int year) 
     {
-        using var connection = new NpgsqlConnection(GetConnectionString()); //[cite: 18]
+        using var connection = new NpgsqlConnection(GetConnectionString());
         var sqlQuery = @"
             SELECT Month, TotalRevenue, TotalProfit, TotalOrders
             FROM MonthlyFinancials
             WHERE Year = @TargetYear
             ORDER BY Month ASC;";
             
-        return connection.Query(sqlQuery, new { TargetYear = year }); //[cite: 18]
+        return connection.Query(sqlQuery, new { TargetYear = year });
     }
 }
