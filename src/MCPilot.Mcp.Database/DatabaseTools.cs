@@ -14,7 +14,42 @@ public static class DatabaseTools
     private static string GetConnectionString()
     {
         var connStr = Environment.GetEnvironmentVariable("MCPILOT_DB_CONNECTION");
-        return connStr ?? throw new Exception("Database connection string is missing, babeee! Check appsettings.");
+
+        if (string.IsNullOrWhiteSpace(connStr))
+        {
+            throw new InvalidOperationException(
+                "MCPILOT_DB_CONNECTION tanimli degil. API'nin Mcp:Servers[].Environment ayarindan gelir.");
+        }
+
+        return NormalizeConnectionString(connStr);
+    }
+
+    // Neon "postgresql://kullanici:sifre@host/db?sslmode=require" bicimini uretir,
+    // Npgsql ise "Host=...;Username=..." anahtar/deger bicimini bekler.
+    // Zaten anahtar/deger bicimindeyse oldugu gibi birakilir.
+    private static string NormalizeConnectionString(string value)
+    {
+        if (!value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) &&
+            !value.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+        {
+            return value;
+        }
+
+        var uri = new Uri(value);
+        var userInfo = uri.UserInfo.Split(':', 2);
+
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.IsDefaultPort ? 5432 : uri.Port,
+            Database = uri.AbsolutePath.TrimStart('/'),
+            Username = Uri.UnescapeDataString(userInfo[0]),
+            Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : null,
+            SslMode = SslMode.Require,
+            TrustServerCertificate = true,
+        };
+
+        return builder.ConnectionString;
     }
 
    [McpServerTool(Name = "get_sales_summary", ReadOnly = true)]
