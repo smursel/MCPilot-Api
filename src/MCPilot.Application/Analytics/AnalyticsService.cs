@@ -44,16 +44,10 @@ public sealed class AnalyticsService(IToolCatalog toolCatalog, ILogger<Analytics
     public async Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(
         DateRange range,
         int limit,
-        string? category,
         CancellationToken ct = default)
     {
         var args = RangeArgs(range);
         args["limit"] = limit;
-
-        if (!string.IsNullOrWhiteSpace(category))
-        {
-            args["category"] = category;
-        }
 
         var current = await InvokeArrayAsync("get_top_products", args, ct);
 
@@ -62,11 +56,6 @@ public sealed class AnalyticsService(IToolCatalog toolCatalog, ILogger<Analytics
         {
             var previousArgs = RangeArgs(range.PreviousPeriod());
             previousArgs["limit"] = Math.Max(limit * 10, 200);
-
-            if (!string.IsNullOrWhiteSpace(category))
-            {
-                previousArgs["category"] = category;
-            }
 
             foreach (var row in await InvokeArrayAsync("get_top_products", previousArgs, ct))
             {
