@@ -1,4 +1,6 @@
 using MCPilot.Api.Infrastructure;
+using MCPilot.Application.Abstractions;
+using MCPilot.Application.Analytics;
 using MCPilot.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -95,11 +97,20 @@ app.UseExceptionHandler(handler => handler.Run(async context =>
     var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("MCPilot.Api");
     logger.LogError(feature?.Error, "Istek islenirken hata olustu: {Path}", context.Request.Path);
 
+    var isUpstreamFailure = feature?.Error is LlmProviderException or AnalyticsUnavailableException;
+
     var problem = new ProblemDetails
     {
-        Title = "Istek islenemedi",
-        Status = StatusCodes.Status500InternalServerError,
-        Detail = app.Environment.IsDevelopment() ? feature?.Error.Message : "Beklenmeyen bir hata olustu.",
+        Title = feature?.Error switch
+        {
+            LlmProviderException => "Yapay zeka servisine erisilemedi",
+            AnalyticsUnavailableException => "Analiz verisi alinamadi",
+            _ => "Istek islenemedi",
+        },
+        Status = isUpstreamFailure ? StatusCodes.Status502BadGateway : StatusCodes.Status500InternalServerError,
+        Detail = app.Environment.IsDevelopment() || isUpstreamFailure
+            ? feature?.Error.Message
+            : "Beklenmeyen bir hata olustu.",
     };
 
     context.Response.StatusCode = problem.Status.Value;

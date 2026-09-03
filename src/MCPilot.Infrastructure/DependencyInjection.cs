@@ -1,5 +1,6 @@
 using Anthropic;
 using MCPilot.Application.Abstractions;
+using MCPilot.Application.Analytics;
 using MCPilot.Application.Chat;
 using MCPilot.Application.Llm;
 using MCPilot.Application.Options;
@@ -52,6 +53,7 @@ public static class DependencyInjection
         services.AddSingleton<IToolCatalog>(sp => sp.GetRequiredService<McpToolCatalog>());
         services.AddSingleton<IConversationStore, InMemoryConversationStore>();
         services.AddScoped<IChatService, ChatService>();
+        services.AddScoped<IAnalyticsService, AnalyticsService>();
 
         return services;
     }
