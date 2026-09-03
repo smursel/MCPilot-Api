@@ -6,7 +6,7 @@ public interface IAnalyticsService
 {
     Task<KpiSummaryDto> GetKpiSummaryAsync(DateRange range, CancellationToken ct = default);
 
-    Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(DateRange range, int limit, CancellationToken ct = default);
+    Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(DateRange range, int limit, string? category, CancellationToken ct = default);
 
     Task<IReadOnlyList<CategorySalesDto>> GetSalesByCategoryAsync(DateRange range, CancellationToken ct = default);
 

@@ -31,6 +31,7 @@ public sealed class AnalyticsController(IAnalyticsService analytics) : Controlle
         [FromQuery] string startDate,
         [FromQuery] string endDate,
         [FromQuery] int limit = 5,
+        [FromQuery] string? category = null,
         CancellationToken cancellationToken = default)
     {
         if (!TryParseRange(startDate, endDate, out var range, out var problem))
@@ -38,7 +39,7 @@ public sealed class AnalyticsController(IAnalyticsService analytics) : Controlle
             return BadRequest(problem);
         }
 
-        return Ok(await analytics.GetTopProductsAsync(range, NormalizeLimit(limit), cancellationToken));
+        return Ok(await analytics.GetTopProductsAsync(range, NormalizeLimit(limit), category, cancellationToken));
     }
 
     [HttpGet("sales-by-category")]
@@ -77,6 +78,7 @@ public sealed class AnalyticsController(IAnalyticsService analytics) : Controlle
     [ProducesResponseType(typeof(IReadOnlyList<TopCustomerDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<TopCustomerDto>>> GetTopCustomers(
         [FromQuery] int limit = 5,
+        [FromQuery] string? category = null,
         CancellationToken cancellationToken = default) =>
         Ok(await analytics.GetTopCustomersAsync(NormalizeLimit(limit), cancellationToken));
 

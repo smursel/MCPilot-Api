@@ -51,6 +51,7 @@ public static class DatabaseTools
             SELECT ProductName, CategoryName, SUM(Quantity) AS TotalUnits, SUM(LineRevenue) AS TotalRevenue, SUM(LineProfit) AS TotalProfit
             FROM vw_SalesAnalytics
             WHERE OrderDate >= @StartDate::timestamp AND OrderDate <= @EndDate::timestamp
+              AND (@CategoryName::text IS NULL OR CategoryName = @CategoryName::text)
             GROUP BY ProductName, CategoryName
             ORDER BY TotalUnits DESC
             LIMIT @Limit;";
